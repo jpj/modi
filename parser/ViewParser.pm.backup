@@ -1,0 +1,118 @@
+package Modi::parser::ViewParser;
+
+use strict;
+use XML::LibXML;
+
+sub new {
+	my $class = shift;
+	my $self = {
+		libXml => new XML::LibXML(),
+		endPrint => "\);\n",
+		startPrint => "\nprint qq\("
+		#endPrint => "\nENDOFVIEW\n",
+		#startPrint => "\nprint <<ENDOFVIEW;\n"
+	};
+	return bless $self, $class;
+}
+
+sub eval {
+	my $self = shift;
+	my $view = shift;
+	my $leConfig = shift;
+	my $tagParser = $self->{libXml};
+
+	#my $endPrint = "\nENDOFVIEW\n";
+	#my $startPrint = "\nprint <<ENDOFVIEW;\n";
+	#my $endPrint = ");\n";
+	#my $startPrint = "\nprint qq(";
+	my $endPrint = $self->{endPrint};
+	my $startPrint = $self->{startPrint};
+
+	my $tfile ="";
+	my $package = $view->getPackage();
+	open (FILE, $view->getUrl()) or die "couldn't open " . $view->getUrl() . ": $!";
+	while (<FILE>) {
+		$tfile .= $_;
+	}
+	close(FILE) or die "Couldn't close " . $view->getUrl() . ": $!";
+
+	## Get rid of comments.
+	$tfile =~ s/<%--.*?--%>//sg;
+
+	while ( $tfile =~ m/(<le>.*?<\/le>)/s ) {
+		my $le = $tagParser->parse_string($1);
+		my $replacement = "";
+
+		foreach my $command ($le->findnodes("le/*")) {
+			if ( $command->nodeName() eq "import" ) {
+				my $importView = $leConfig->getViewById( $command->getAttribute("view") );
+				if ( $importView == undef ) {
+					die "Import view '" . $command->getAttribute("view") . "' not found.";
+				}
+				$replacement .= $endPrint;
+				$replacement .= "my \$" . $importView->getId() . " = new " . $importView->getPackage() . "();\n";
+				foreach my $attribute ( $command->getChildrenByTagName("attribute") ) {
+					$replacement .= '$'.$importView->getId().'->setAttribute("'.$attribute->getAttribute('name').
+						'", "'.$attribute->getAttribute('value').'");'."\n";
+				}
+				$replacement .= '$' . $importView->getId() . "->printView(\$request);" . $startPrint;
+			} elsif ( $command->nodeName() eq "out" ) {
+				my $attribute = $command->getAttribute("value");
+				$replacement .= $endPrint.'print $self->getAttribute("'.$attribute.'");'."\n".$startPrint;
+			#} elsif ( $command->nodeName() eq "print" ) {
+			} else {
+				$replacement = "[Command \"".$command->nodeName()."\" not found]";
+			}
+		}
+
+		$tfile =~ s/<le>.*?<\/le>/$replacement/s;
+	}
+	$tfile =~ s/<%/$endPrint/g;
+	$tfile =~ s/%>/$startPrint/g;
+		
+	my $viewFile = <<EOF;
+package $package;
+
+use strict;
+
+sub new {
+	my \$class = shift;
+	my \$self = {
+		attributes => {}
+	};
+	bless \$self, \$class;
+	return \$self;
+}
+
+sub setAttribute {
+	my \$self = shift;
+	my \$name = shift;
+	my \$value = shift;
+
+	\$self->{attributes}->{\$name} = \$value;
+}
+
+sub getAttribute {
+	my \$self = shift;
+	my \$name = shift;
+	return \$self->{attributes}->{\$name};
+}
+
+sub printView {
+	my \$self = shift;
+	my \$request = shift;
+	$self->{startPrint}$tfile$self->{endPrint};
+}
+
+1;
+EOF
+	#open(TMP, ">/tmp/le/view/".$view->getId()) or die "Couldn't upen tmp view file for writing: $!";
+	#print TMP $viewFile;
+	#close(TMP) or die "Couldn't close tmp view file: $!";
+	eval($viewFile) or die "Error evaling view \"".$view->getId()."\": \n\n============================\n$viewFile\n";
+
+	return new $package;
+}
+
+1;
+

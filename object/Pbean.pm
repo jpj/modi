@@ -1,0 +1,57 @@
+package Modi::object::Pbean;
+
+use strict;
+
+sub new {
+	my $class = shift;
+	my $self = {
+		id => undef,
+		package => undef,
+		url => undef,
+		object => undef
+	};
+	return bless $self, $class;
+}
+
+sub setId {
+	my $self = shift;
+	$self->{id} = shift;
+}
+
+sub getId {
+	my $self = shift;
+	return $self->{id};
+}
+
+sub setPackage {
+	my $self = shift;
+	$self->{package} = shift;
+}
+
+sub getPackage {
+	my $self = shift;
+	return $self->{package};
+}
+
+sub setUrl {
+	my $self = shift;
+	$self->{url} = shift;
+}
+
+sub getUrl {
+	my $self = shift;
+	return $self->{url};
+}
+
+sub setObject {
+	my $self = shift;
+	$self->{object} = shift;
+}
+
+sub getObject {
+	my $self = shift;
+	return $self->{object};
+}
+
+1;
+
