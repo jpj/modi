@@ -106,9 +106,6 @@ sub printView {
 
 1;
 EOF
-	#open(TMP, ">/tmp/le/view/".$view->getId()) or die "Couldn't upen tmp view file for writing: $!";
-	#print TMP $viewFile;
-	#close(TMP) or die "Couldn't close tmp view file: $!";
 	eval($viewFile) or die "Error evaling view \"".$view->getId()."\": \n\n============================\n$viewFile\n";
 
 	return new $package;
